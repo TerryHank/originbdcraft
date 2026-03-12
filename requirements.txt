@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+pillow
+numpy
+reportlab<4.1
+python-multipart
+jinja2

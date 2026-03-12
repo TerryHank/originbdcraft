@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BeadCraft - Perler Bead Pattern Generator</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="header">
+    <a class="header-logo" href="/">BeadCraft</a>
+    <div class="header-right">
+      <div class="lang-switcher">
+        <button class="lang-btn active" data-lang="zh" onclick="setLanguage('zh')">CN</button>
+        <button class="lang-btn" data-lang="en" onclick="setLanguage('en')">EN</button>
+      </div>
+      <a class="header-link" href="/docs" target="_blank" data-i18n="header.api_docs">API Docs</a>
+    </div>
+  </header>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Main Layout -->
+  <div class="main-container">
+
+    <!-- Left Panel -->
+    <div class="left-panel">
+
+      <!-- Upload Area -->
+      <div id="upload-area" class="upload-area">
+        <div class="upload-area-icon">+</div>
+        <div class="upload-area-text" data-i18n="upload.drop_hint">Drop image here or click to upload</div>
+        <div class="upload-area-hint" data-i18n="upload.format_hint">JPG, PNG, GIF, WEBP (max 20MB)</div>
+      </div>
+      <input type="file" id="file-input" class="hidden-input" accept="image/jpeg,image/png,image/gif,image/webp">
+
+      <!-- Example Images Gallery -->
+      <div class="section examples-section">
+        <div class="section-title" data-i18n="examples.title">Example Images</div>
+        <div class="examples-gallery">
+          <div class="example-item" onclick="loadExampleImage('luoxiaohei')">
+            <img src="/examples/luoxiaohei_thumb.png" alt="Luo Xiaohei" class="example-thumb">
+            <div class="example-name">Luo Xiaohei</div>
+          </div>
+          <div class="example-item" onclick="loadExampleImage('meili')">
+            <img src="/examples/meili_thumb.png" alt="Meili" class="example-thumb">
+            <div class="example-name">Meili</div>
+          </div>
+          <div class="example-item" onclick="loadExampleImage('pony')">
+            <img src="/examples/pony_thumb.png" alt="Pony" class="example-thumb">
+            <div class="example-name">Pony</div>
+          </div>
+          <div class="example-item" onclick="loadExampleImage('usachi')">
+            <img src="/examples/usachi_thumb.png" alt="Usachi" class="example-thumb">
+            <div class="example-name">Usachi</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Preview -->
+      <div id="preview-section" class="preview-section" style="display: none;">
+        <img id="preview-image" class="preview-image" alt="Preview">
+      </div>
+
+      <!-- Settings Panel -->
+      <div id="settings-panel" style="display: none;">
+
+        <!-- Palette Preset -->
+        <div class="section" style="border-top: none; padding-top: 12px;">
+          <div class="section-title" data-i18n="settings.palette_preset">Palette Preset</div>
+          <div class="preset-group">
+            <button class="preset-btn" data-preset="96" onclick="setPreset('96')">96</button>
+            <button class="preset-btn" data-preset="120" onclick="setPreset('120')">120</button>
+            <button class="preset-btn" data-preset="144" onclick="setPreset('144')">144</button>
+            <button class="preset-btn" data-preset="168" onclick="setPreset('168')">168</button>
+            <button class="preset-btn active" data-preset="221" onclick="setPreset('221')">221</button>
+          </div>
+        </div>
+
+        <!-- Grid Size -->
+        <div class="section">
+          <div class="section-title" data-i18n="settings.board_size">Bead Board Size</div>
+
+          <div class="radio-group" style="margin-bottom: 12px;">
+            <label class="radio-item">
+              <input type="radio" name="grid-mode" value="fixed" checked onchange="setGridMode('fixed')">
+              <span data-i18n="settings.fixed_grid">Fixed Grid</span>
+            </label>
+            <label class="radio-item">
+              <input type="radio" name="grid-mode" value="pixel" onchange="setGridMode('pixel')">
+              <span data-i18n="settings.pixel_block">Pixel Block Size</span>
+            </label>
+          </div>
+
+          <div id="grid-fixed-options">
+            <select id="grid-size-select">
+              <option value="15x15">15 x 15 pegs (small)</option>
+              <option value="29x29">29 x 29 pegs (1 board)</option>
+              <option value="32x32">32 x 32 pegs</option>
+              <option value="48x48" selected>48 x 48 pegs</option>
+              <option value="58x58">58 x 58 pegs (2x2 boards)</option>
+              <option value="64x64">64 x 64 pegs</option>
+              <option value="87x87">87 x 87 pegs (3x3 boards)</option>
+              <option value="96x96">96 x 96 pegs</option>
+            </select>
+          </div>
+
+          <div id="grid-pixel-options" style="display: none;">
+            <label class="form-label">
+              <span data-i18n="settings.pixel_block_label">Pixel block size:</span> <span id="pixel-size-value">8px</span>
+            </label>
+            <input type="range" id="pixel-size-slider" min="4" max="32" value="8" step="1">
+          </div>
+        </div>
+
+        <!-- Color Controls -->
+        <div class="section">
+          <div class="section-title" data-i18n="settings.color_controls">Color Controls</div>
+
+          <label class="form-label">
+            <span data-i18n="settings.max_colors">Max colors:</span> <span id="max-colors-value">Auto</span>
+          </label>
+          <input type="range" id="max-colors-slider" min="0" max="60" value="0" step="1">
+          <div class="form-hint" data-i18n="settings.max_colors_hint">0 = unlimited (auto). Drag to limit the number of colors used.</div>
+
+          <label class="form-label" style="margin-top: 12px;">
+            <span data-i18n="settings.merge_threshold">Color merge threshold:</span> <span id="similarity-value">Off</span>
+          </label>
+          <input type="range" id="similarity-slider" min="0" max="50" value="0" step="1">
+          <div class="form-hint" data-i18n="settings.merge_hint">Merge similar colors to reduce total count. Higher = more merging.</div>
+        </div>
+
+        <!-- Image Adjustments -->
+        <div class="section">
+          <div class="section-title" data-i18n="settings.image_adjustments">Image Adjustments</div>
+
+          <label class="form-label">
+            <span data-i18n="settings.contrast">Contrast:</span> <span id="contrast-value">Auto</span>
+          </label>
+          <input type="range" id="contrast-slider" min="-50" max="50" value="0" step="1">
+
+          <label class="form-label" style="margin-top: 8px;">
+            <span data-i18n="settings.saturation">Saturation:</span> <span id="saturation-value">Auto</span>
+          </label>
+          <input type="range" id="saturation-slider" min="-50" max="50" value="0" step="1">
+
+          <label class="form-label" style="margin-top: 8px;">
+            <span data-i18n="settings.sharpness">Sharpness:</span> <span id="sharpness-value">Auto</span>
+          </label>
+          <input type="range" id="sharpness-slider" min="-50" max="50" value="0" step="1">
+
+          <div class="form-hint" data-i18n="settings.adjust_hint">0 = auto-detect. Drag left to reduce, right to boost.</div>
+        </div>
+
+        <!-- Background Removal -->
+        <div class="section">
+          <div class="section-title" data-i18n="settings.bg_removal">Background Removal</div>
+          <label class="checkbox-item">
+            <input type="checkbox" id="remove-bg-checkbox">
+            <span data-i18n="settings.auto_remove_bg">Auto remove background</span>
+          </label>
+          <div class="form-hint" data-i18n="settings.bg_hint">Detects the dominant border color and flood-fills it as transparent.</div>
+        </div>
+
+        <!-- Dithering -->
+        <div class="section">
+          <div class="section-title" data-i18n="settings.dithering">Dithering</div>
+          <label class="checkbox-item">
+            <input type="checkbox" id="dithering-checkbox">
+            <span data-i18n="settings.enable_dithering">Enable Floyd-Steinberg dithering</span>
+          </label>
+          <div class="form-hint" data-i18n="settings.dithering_hint">Produces smoother color transitions but takes longer</div>
+        </div>
+
+        <!-- Generate Button -->
+        <div class="section" style="border-top: none; padding-top: 8px;">
+          <button id="generate-btn" class="btn btn-primary" data-i18n="btn.generate">Generate Pattern</button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Right Panel -->
+    <div class="right-panel">
+
+      <!-- Empty State -->
+      <div id="empty-state" class="empty-state">
+        <div class="empty-state-icon">&#9638;</div>
+        <div class="empty-state-text" data-i18n="result.empty">Upload an image and generate a pattern</div>
+      </div>
+
+      <!-- Result Area -->
+      <div id="result-area" style="display: none; width: 100%; max-width: 640px;">
+
+        <!-- Canvas Toolbar -->
+        <div class="canvas-toolbar">
+          <button id="edit-toggle" class="toggle-btn" onclick="toggleEditMode()" data-i18n="btn.edit">Edit</button>
+          <div style="flex: 1;"></div>
+          <button class="btn btn-secondary" onclick="exportPNG()" data-i18n="btn.export_png">Export PNG</button>
+          <button class="btn btn-secondary" onclick="exportPDF()" data-i18n="btn.export_pdf">Export PDF</button>
+        </div>
+
+        <!-- Canvas -->
+        <div class="canvas-container" style="margin: 0 auto;">
+          <canvas id="pattern-canvas"></canvas>
+        </div>
+
+        <!-- Color Panel -->
+        <div class="color-panel">
+          <div class="color-panel-title" data-i18n="result.colors_used">Colors Used</div>
+          <div id="color-list" class="color-list"></div>
+          <div id="color-total" class="color-total"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/i18n.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>
