@@ -80,6 +80,27 @@ const I18N = {
     // Slider values
     'value.auto': '自动',
     'value.off': '关闭',
+
+    // Serial port
+    'btn.send_esp32': '发送到 ESP32',
+    'serial.title': '发送到 ESP32',
+    'serial.port': '串口:',
+    'serial.baud_rate': '波特率:',
+    'serial.bg_color': '背景色 (透明区域):',
+    'serial.scanning': '扫描中...',
+    'serial.no_ports': '未找到串口',
+    'serial.scan_failed': '扫描失败',
+    'serial.refresh': '刷新',
+    'serial.send': '发送',
+    'serial.sending': '正在发送...',
+    'serial.success': '发送成功! {bytes} 字节, 耗时 {ms}ms',
+    'serial.error': '错误: {msg}',
+    'serial.select_port': '请选择串口',
+    'serial.send_success': '已发送到 ESP32',
+    'serial.esp32_log': 'ESP32 日志:',
+    'serial.clear': '清除',
+    'btn.cancel': '取消',
+    'toast.generate_first': '请先生成图案',
   },
 
   en: {
@@ -161,6 +182,27 @@ const I18N = {
     // Slider values
     'value.auto': 'Auto',
     'value.off': 'Off',
+
+    // Serial port
+    'btn.send_esp32': 'Send to ESP32',
+    'serial.title': 'Send to ESP32',
+    'serial.port': 'Serial Port:',
+    'serial.baud_rate': 'Baud Rate:',
+    'serial.bg_color': 'Background Color (transparent areas):',
+    'serial.scanning': 'Scanning...',
+    'serial.no_ports': 'No ports found',
+    'serial.scan_failed': 'Scan failed',
+    'serial.refresh': 'Refresh',
+    'serial.send': 'Send',
+    'serial.sending': 'Sending...',
+    'serial.success': 'Success! {bytes} bytes sent in {ms}ms',
+    'serial.error': 'Error: {msg}',
+    'serial.select_port': 'Please select a port',
+    'serial.send_success': 'Sent to ESP32',
+    'serial.esp32_log': 'ESP32 Log:',
+    'serial.clear': 'Clear',
+    'btn.cancel': 'Cancel',
+    'toast.generate_first': 'Please generate a pattern first',
   }
 };
 

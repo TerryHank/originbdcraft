@@ -277,11 +277,17 @@ def process_image(
     for code, count in color_counter.most_common():
         color_info = palette.get_by_code(code)
         if color_info:
+            # Parse hex to RGB
+            hex_c = color_info['hex']
+            r = int(hex_c[1:3], 16)
+            g = int(hex_c[3:5], 16)
+            b = int(hex_c[5:7], 16)
             color_summary.append({
                 'code': color_info['code'],
                 'name': color_info['name'],
                 'name_zh': color_info['name_zh'],
-                'hex': color_info['hex'],
+                'hex': hex_c,
+                'rgb': [r, g, b],
                 'count': count,
             })
 

@@ -262,7 +262,7 @@ class ArtkalPalette:
                             allowed_indices: Optional[np.ndarray] = None) -> np.ndarray:
         """Select the top N palette colors that best represent the given pixels.
 
-        Strategy: Map each pixel to its closest palette color, then select
+        Strategy: Map each pixel to closest palette color, then select
         the top N most frequently used colors.
 
         Args:
@@ -279,8 +279,9 @@ class ArtkalPalette:
         # Count frequency
         unique, counts = np.unique(all_indices, return_counts=True)
 
-        # Sort by frequency (descending) and take top N
+        # Sort by frequency (descending) and take top N (but not more than available)
         sorted_order = np.argsort(-counts)
-        top_n = unique[sorted_order[:n]]
+        actual_n = min(n, len(unique))  # Fix: don't exceed available colors
+        top_n = unique[sorted_order[:actual_n]]
 
         return np.sort(top_n)

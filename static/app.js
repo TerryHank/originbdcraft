@@ -17,6 +17,30 @@ window.appState = {
   totalBeads: 0,
 };
 
+// === Clear Canvas ===
+function clearCanvas() {
+  // Reset state
+  window.appState.originalImage = null;
+  window.appState.pixelMatrix = null;
+  window.appState.colorData = {};
+  window.appState.colorSummary = [];
+  window.appState.gridSize = { width: 0, height: 0 };
+  window.appState.activeColors = new Set();
+
+  // Hide canvas, show empty-state
+  document.getElementById('pattern-canvas').style.display = 'none';
+  document.getElementById('color-panel').style.display = 'none';
+  document.getElementById('empty-state').classList.remove('hidden');
+
+  // Clear canvas
+  const canvas = document.getElementById('pattern-canvas');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Hide settings panel
+  document.getElementById('settings-panel').style.display = 'none';
+}
+
 // === Initialization ===
 document.addEventListener('DOMContentLoaded', () => {
   loadFullPalette();
@@ -24,6 +48,19 @@ document.addEventListener('DOMContentLoaded', () => {
   initTabs();
   initControls();
   applyTranslations();
+  
+  // Auto-scan and select serial port (ESP32/CH340/CP210x)
+  refreshSerialPorts(true);
+  
+  // Auto-generate pattern when LED size changes
+  const ledSizeSelect = document.getElementById('led-matrix-size');
+  if (ledSizeSelect) {
+    ledSizeSelect.addEventListener('change', () => {
+      if (window.appState.originalImage) {
+        generatePattern();
+      }
+    });
+  }
 });
 
 // === Load Example Image ===
@@ -39,20 +76,14 @@ async function loadExampleImage(name) {
     const blob = await response.blob();
     const file = new File([blob], `${name}_original.jpg`, { type: 'image/jpeg' });
 
-    // Set as original image
+    // Set as original image and generate directly
     window.appState.originalImage = file;
+    document.getElementById('empty-state').classList.add('hidden');
+    document.getElementById('settings-panel').style.display = 'block';
+    
+    // Generate pattern directly
+    await generatePattern();
 
-    // Show preview
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const preview = document.getElementById('preview-image');
-      preview.src = e.target.result;
-      document.getElementById('preview-section').style.display = 'block';
-      document.getElementById('settings-panel').style.display = 'block';
-    };
-    reader.readAsDataURL(file);
-
-    showToast(t('toast.example_loaded'));
   } catch (err) {
     showToast(t('toast.example_load_error'), true);
   }
@@ -111,29 +142,14 @@ function showToast(message, isError = false) {
 
 // === File Upload ===
 function initUpload() {
-  const area = document.getElementById('upload-area');
   const input = document.getElementById('file-input');
 
-  area.addEventListener('click', () => input.click());
-
-  area.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    area.classList.add('dragging');
-  });
-
-  area.addEventListener('dragleave', () => {
-    area.classList.remove('dragging');
-  });
-
-  area.addEventListener('drop', (e) => {
-    e.preventDefault();
-    area.classList.remove('dragging');
-    const files = e.dataTransfer.files;
-    if (files.length > 0) handleFile(files[0]);
-  });
-
   input.addEventListener('change', () => {
-    if (input.files.length > 0) handleFile(input.files[0]);
+    if (input.files.length > 0) {
+      const file = input.files[0];
+      input.value = '';  // Reset so user can select same file again
+      handleFile(file);
+    }
   });
 }
 
@@ -151,17 +167,133 @@ function handleFile(file) {
     return;
   }
 
-  window.appState.originalImage = file;
+  // Show crop dialog
+  showCropDialog(file);
+}
 
-  // Show preview
+// === Image Crop ===
+let cropState = {
+  file: null,
+  img: null,
+  scale: 1,
+  box: { x: 0, y: 0, size: 0 },
+  dragging: false,
+  startX: 0,
+  startY: 0,
+};
+
+function showCropDialog(file) {
+  cropState.file = file;
+  
   const reader = new FileReader();
   reader.onload = (e) => {
-    const preview = document.getElementById('preview-image');
-    preview.src = e.target.result;
-    document.getElementById('preview-section').style.display = 'block';
-    document.getElementById('settings-panel').style.display = 'block';
+    const img = new Image();
+    img.onload = () => {
+      cropState.img = img;
+      
+      const cropImg = document.getElementById('crop-image');
+      cropImg.src = e.target.result;
+      
+      // Calculate display scale
+      const container = document.getElementById('crop-container');
+      const maxW = window.innerWidth * 0.85;
+      const maxH = window.innerHeight * 0.65;
+      cropState.scale = Math.min(maxW / img.width, maxH / img.height, 1);
+      
+      cropImg.style.width = (img.width * cropState.scale) + 'px';
+      cropImg.style.height = (img.height * cropState.scale) + 'px';
+      
+      // Initialize crop box (square based on min dimension)
+      const minDim = Math.min(img.width, img.height);
+      cropState.box.size = minDim;
+      cropState.box.x = (img.width - minDim) / 2;
+      cropState.box.y = (img.height - minDim) / 2;
+      
+      updateCropBox();
+      
+      // Show dialog
+      document.getElementById('crop-dialog').style.display = 'flex';
+      
+      // Setup drag
+      setupCropDrag();
+    };
+    img.src = e.target.result;
   };
   reader.readAsDataURL(file);
+}
+
+function updateCropBox() {
+  const box = document.getElementById('crop-box');
+  const scale = cropState.scale;
+  box.style.left = (cropState.box.x * scale) + 'px';
+  box.style.top = (cropState.box.y * scale) + 'px';
+  box.style.width = (cropState.box.size * scale) + 'px';
+  box.style.height = (cropState.box.size * scale) + 'px';
+}
+
+function setupCropDrag() {
+  const box = document.getElementById('crop-box');
+  
+  box.onmousedown = (e) => {
+    e.preventDefault();
+    cropState.dragging = true;
+    cropState.startX = e.clientX - cropState.box.x * cropState.scale;
+    cropState.startY = e.clientY - cropState.box.y * cropState.scale;
+  };
+  
+  document.onmousemove = (e) => {
+    if (!cropState.dragging) return;
+    
+    let newX = (e.clientX - cropState.startX) / cropState.scale;
+    let newY = (e.clientY - cropState.startY) / cropState.scale;
+    
+    // Clamp to image bounds
+    const img = cropState.img;
+    const size = cropState.box.size;
+    newX = Math.max(0, Math.min(newX, img.width - size));
+    newY = Math.max(0, Math.min(newY, img.height - size));
+    
+    cropState.box.x = newX;
+    cropState.box.y = newY;
+    updateCropBox();
+  };
+  
+  document.onmouseup = () => {
+    cropState.dragging = false;
+  };
+}
+
+function cancelCrop() {
+  document.getElementById('crop-dialog').style.display = 'none';
+  cropState = { file: null, img: null, scale: 1, box: { x: 0, y: 0, size: 0 }, dragging: false };
+}
+
+function confirmCrop() {
+  const img = cropState.img;
+  const box = cropState.box;
+  
+  // Create canvas and crop
+  const canvas = document.createElement('canvas');
+  canvas.width = box.size;
+  canvas.height = box.size;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, box.x, box.y, box.size, box.size, 0, 0, box.size, box.size);
+  
+  // Convert to blob
+  canvas.toBlob((blob) => {
+    const croppedFile = new File([blob], cropState.file.name, { type: 'image/jpeg' });
+    window.appState.originalImage = croppedFile;
+    
+    // Close dialog
+    cancelCrop();
+    
+    // Hide empty-state and generate directly
+    document.getElementById('empty-state').classList.add('hidden');
+    document.getElementById('settings-panel').style.display = 'block';
+    
+    // Generate pattern directly
+    generatePattern();
+  }, 'image/jpeg', 0.95);
 }
 
 // === Tab Switching ===
@@ -269,28 +401,42 @@ async function generatePattern() {
     return;
   }
 
-  const btn = document.getElementById('generate-btn');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> ' + t('toast.processing');
-
   // Build form data
   const formData = new FormData();
   formData.append('file', window.appState.originalImage);
 
-  // Grid mode
-  const gridMode = document.querySelector('input[name="grid-mode"]:checked')?.value || 'fixed';
-  if (gridMode === 'fixed') {
-    formData.append('mode', 'fixed_grid');
-    const gridSelect = document.getElementById('grid-size-select');
-    const [w, h] = gridSelect.value.split('x').map(Number);
-    formData.append('grid_width', w);
-    formData.append('grid_height', h);
-  } else {
-    formData.append('mode', 'pixel_size');
-    formData.append('pixel_size', document.getElementById('pixel-size-slider').value);
+  // Get difficulty setting
+  const gridSelect = document.getElementById('grid-size-select');
+  const difficulty = gridSelect?.value || 'normal';
+  
+  // Get original image dimensions
+  const img = window.appState.originalImage;
+  const imgWidth = img.width || img.naturalWidth || 512;
+  const imgHeight = img.height || img.naturalHeight || 512;
+  
+  // Calculate scale based on difficulty
+  let scale;
+  if (difficulty === 'simple') {
+    scale = 0.25;  // 1/4 resolution
+  } else if (difficulty === 'normal') {
+    scale = 0.5;   // 1/2 resolution
+  } else { // hard
+    scale = 1.0;   // original resolution
   }
+  
+  // Calculate grid size based on original image and difficulty
+  const gridWidth = Math.max(16, Math.round(imgWidth * scale));
+  const gridHeight = Math.max(16, Math.round(imgHeight * scale));
+  
+  // LED size for ESP32 display
+  const ledSize = parseInt(document.getElementById('led-matrix-size').value) || 64;
+  
+  formData.append('mode', 'fixed_grid');
+  formData.append('grid_width', gridWidth);
+  formData.append('grid_height', gridHeight);
+  formData.append('led_size', ledSize);
 
-  // Dithering
+  // Dithering (disabled by default)
   const dithering = document.getElementById('dithering-checkbox')?.checked || false;
   formData.append('use_dithering', dithering);
 
@@ -354,22 +500,122 @@ async function generatePattern() {
       window.appState.colorData[c.code] = c;
     });
 
-    // Render result
-    document.getElementById('result-area').style.display = 'block';
-    document.getElementById('empty-state').style.display = 'none';
+    // Render result: show canvas, hide empty-state, show color panel
+    document.getElementById('empty-state').classList.add('hidden');
+    document.getElementById('pattern-canvas').style.display = 'block';
+    document.getElementById('color-panel').style.display = 'block';
     renderCanvas();
     renderColorPanel();
 
     showToast(t('toast.pattern_result', { w: data.grid_size.width, h: data.grid_size.height, c: data.color_summary.length }));
+
+    // Auto-send to ESP32 via serial
+    await autoSendToESP32();
+
   } catch (err) {
     if (err.name === 'AbortError') {
       showToast(t('toast.timeout'), true);
     } else {
       showToast(err.message, true);
     }
-  } finally {
-    btn.disabled = false;
-    btn.textContent = t('btn.generate');
+  }
+}
+
+// === Auto Send to ESP32 after generation ===
+async function autoSendToESP32() {
+  const { pixelMatrix, connectionMode } = window.appState;
+  if (!pixelMatrix) return;
+
+  const bgColor = document.getElementById('serial-bg-color')?.value || '#000000';
+  const bgRgb = [
+    parseInt(bgColor.slice(1, 3), 16),
+    parseInt(bgColor.slice(3, 5), 16),
+    parseInt(bgColor.slice(5, 7), 16),
+  ];
+
+  // Show toast
+  const toast = document.getElementById('serial-toast');
+  if (toast) {
+    toast.textContent = connectionMode === 'ble' ? 'Connecting via Bluetooth...' : t('serial.sending');
+    toast.className = 'serial-toast';
+    toast.style.display = 'block';
+  }
+
+  try {
+    let result;
+    
+    if (connectionMode === 'ble') {
+      // BLE mode
+      const deviceAddress = document.getElementById('ble-device-select')?.value;
+      if (!deviceAddress) {
+        showToast('Please select a BLE device in settings', true);
+        if (toast) toast.style.display = 'none';
+        return;
+      }
+      
+      const response = await fetch('/api/ble/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pixel_matrix: pixelMatrix,
+          device_address: deviceAddress,
+          background_color: bgRgb,
+        }),
+      });
+      result = await response.json();
+    } else {
+      // Serial mode (default)
+      const port = document.getElementById('serial-port-select')?.value;
+      if (!port) {
+        showToast('Please select a serial port in settings', true);
+        if (toast) toast.style.display = 'none';
+        return;
+      }
+      
+      const baudRate = parseInt(document.getElementById('serial-baud-select')?.value) || 460800;
+      const ledSize = document.getElementById('led-matrix-size')?.value || '64';
+      const ledMatrixSize = `${ledSize}x${ledSize}`;  // Format as "64x64"
+      
+      const response = await fetch('/api/serial/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pixel_matrix: pixelMatrix,
+          port: port,
+          baud_rate: baudRate,
+          background_color: bgRgb,
+          led_matrix_size: ledMatrixSize,
+        }),
+      });
+      result = await response.json();
+    }
+
+    if (result.success) {
+      if (toast) {
+        toast.textContent = `Sent ${result.bytes_sent} bytes in ${result.duration_ms}ms`;
+        toast.className = 'serial-toast success';
+      }
+      showToast(connectionMode === 'ble' ? 'Image sent via Bluetooth!' : t('serial.send_success'));
+    } else {
+      if (toast) {
+        toast.textContent = result.message;
+        toast.className = 'serial-toast error';
+      }
+    }
+
+    // Hide toast after 3s
+    setTimeout(() => {
+      if (toast) toast.style.display = 'none';
+    }, 3000);
+
+  } catch (err) {
+    if (toast) {
+      toast.textContent = err.message;
+      toast.className = 'serial-toast error';
+      setTimeout(() => {
+        toast.style.display = 'none';
+      }, 3000);
+    }
   }
 }
 
@@ -650,11 +896,9 @@ function renderColorPanel() {
     const tag = document.createElement('div');
     tag.className = 'color-tag' + (window.appState.activeColors.has(item.code) ? ' active' : '');
     tag.dataset.code = item.code;
+    tag.title = `${item.name} (${item.code})`;
     tag.innerHTML = `
       <span class="color-swatch" style="background: ${item.hex}"></span>
-      <span class="color-code">${item.code}</span>
-      <span class="color-name">${item.name}</span>
-      <span class="color-count">${item.count}</span>
     `;
 
     tag.addEventListener('click', () => {
@@ -687,6 +931,54 @@ function toggleColorHighlight(code) {
   });
 
   renderCanvas();
+  
+  // Sync to ESP32
+  sendHighlightToESP32();
+}
+
+// === Send Highlight to ESP32 ===
+async function sendHighlightToESP32() {
+  const { pixelMatrix, activeColors, connectionMode, colorData } = window.appState;
+  if (!pixelMatrix) return;
+  
+  // Get RGB values for highlighted colors
+  const highlightRGB = [];
+  activeColors.forEach(code => {
+    if (colorData[code] && colorData[code].rgb) {
+      highlightRGB.push(colorData[code].rgb);
+    }
+  });
+  
+  try {
+    if (connectionMode === 'ble') {
+      const deviceAddress = document.getElementById('ble-device-select')?.value;
+      if (!deviceAddress) return;
+      
+      await fetch('/api/ble/highlight', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          highlight_colors: highlightRGB,
+          device_address: deviceAddress,
+        }),
+      });
+    } else {
+      // Serial mode - send highlight command
+      const port = document.getElementById('serial-port-select')?.value;
+      if (!port) return;
+      
+      await fetch('/api/serial/highlight', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          highlight_colors: highlightRGB,
+          port: port,
+        }),
+      });
+    }
+  } catch (err) {
+    console.error('ESP32 highlight sync failed:', err);
+  }
 }
 
 // === Edit Mode Toggle ===
@@ -783,5 +1075,254 @@ async function exportPDF() {
     showToast(t('toast.pdf_success'));
   } catch (err) {
     showToast(t('toast.pdf_failed'), true);
+  }
+}
+
+// === Export JSON ===
+async function exportJSON() {
+  const { pixelMatrix, colorSummary } = window.appState;
+  if (!pixelMatrix) return;
+
+  try {
+    const response = await fetch('/api/export/json', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pixel_matrix: pixelMatrix,
+        color_summary: colorSummary,
+      }),
+    });
+
+    if (!response.ok) throw new Error('Export failed');
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `beadcraft_pattern_${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    showToast('JSON exported successfully');
+  } catch (err) {
+    showToast('JSON export failed', true);
+  }
+}
+
+// === Serial Port Settings Dialog ===
+window.appState.connectionMode = 'serial';  // 'ble' or 'serial' (default: serial)
+
+function setConnectionMode(mode) {
+  window.appState.connectionMode = mode;
+  
+  // Update button states
+  document.querySelectorAll('.mode-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.textContent.toLowerCase().includes(mode));
+  });
+  
+  // Toggle visibility
+  document.getElementById('ble-settings').style.display = mode === 'ble' ? 'block' : 'none';
+  document.getElementById('serial-settings').style.display = mode === 'serial' ? 'block' : 'none';
+  
+  // Auto-scan
+  if (mode === 'ble') {
+    refreshBLEDevices();
+  } else {
+    refreshSerialPorts(true);
+  }
+}
+
+function showSerialSettings() {
+  const { pixelMatrix } = window.appState;
+  if (!pixelMatrix) {
+    showToast(t('toast.generate_first'), true);
+    return;
+  }
+
+  document.getElementById('serial-settings-dialog').style.display = 'flex';
+  
+  // Auto-scan based on mode
+  if (window.appState.connectionMode === 'ble') {
+    refreshBLEDevices();
+  } else {
+    refreshSerialPorts(true);
+  }
+}
+
+function hideSerialSettings() {
+  document.getElementById('serial-settings-dialog').style.display = 'none';
+}
+
+// === BLE Device Scanning ===
+async function refreshBLEDevices() {
+  const select = document.getElementById('ble-device-select');
+  select.innerHTML = '<option value="">Scanning...</option>';
+
+  try {
+    const response = await fetch('/api/ble/devices');
+    if (!response.ok) throw new Error('Failed to scan BLE');
+    
+    const data = await response.json();
+    const devices = data.devices || [];
+    
+    if (devices.length === 0) {
+      select.innerHTML = '<option value="">No devices found</option>';
+      return;
+    }
+    
+    select.innerHTML = '<option value="">Select device</option>';
+    devices.forEach(device => {
+      const opt = document.createElement('option');
+      opt.value = device.address;
+      opt.textContent = device.name || device.address;
+      select.appendChild(opt);
+    });
+    
+    // Auto-select first device
+    if (devices.length > 0) {
+      select.value = devices[0].address;
+    }
+  } catch (err) {
+    select.innerHTML = '<option value="">Scan failed</option>';
+  }
+}
+
+// === One-Click Send to ESP32 ===
+async function sendToESP32Direct() {
+  const { pixelMatrix, connectionMode } = window.appState;
+  if (!pixelMatrix) {
+    showToast(t('toast.generate_first'), true);
+    return;
+  }
+
+  const bgColor = document.getElementById('serial-bg-color').value;
+  const bgRgb = [
+    parseInt(bgColor.slice(1, 3), 16),
+    parseInt(bgColor.slice(3, 5), 16),
+    parseInt(bgColor.slice(5, 7), 16),
+  ];
+
+  // Show toast
+  const toast = document.getElementById('serial-toast');
+  toast.textContent = connectionMode === 'ble' ? 'Connecting via Bluetooth...' : t('serial.sending');
+  toast.className = 'serial-toast';
+  toast.style.display = 'block';
+
+  try {
+    let result;
+    
+    if (connectionMode === 'ble') {
+      // BLE mode
+      const deviceAddress = document.getElementById('ble-device-select').value;
+      if (!deviceAddress) {
+        showToast('Please select a BLE device', true);
+        showSerialSettings();
+        toast.style.display = 'none';
+        return;
+      }
+      
+      const response = await fetch('/api/ble/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pixel_matrix: pixelMatrix,
+          device_address: deviceAddress,
+          background_color: bgRgb,
+        }),
+      });
+      result = await response.json();
+    } else {
+      // Serial mode
+      const port = document.getElementById('serial-port-select').value;
+      if (!port) {
+        showToast(t('serial.select_port'), true);
+        showSerialSettings();
+        toast.style.display = 'none';
+        return;
+      }
+      
+      const baudRate = parseInt(document.getElementById('serial-baud-select').value) || 460800;
+      
+      const response = await fetch('/api/serial/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pixel_matrix: pixelMatrix,
+          port: port,
+          baud_rate: baudRate,
+          background_color: bgRgb,
+        }),
+      });
+      result = await response.json();
+    }
+
+    if (result.success) {
+      toast.textContent = `Sent ${result.bytes_sent} bytes in ${result.duration_ms}ms`;
+      toast.className = 'serial-toast success';
+      showToast(connectionMode === 'ble' ? 'Image sent via Bluetooth!' : t('serial.send_success'));
+    } else {
+      toast.textContent = result.message;
+      toast.className = 'serial-toast error';
+    }
+
+    // Hide toast after 3s
+    setTimeout(() => {
+      toast.style.display = 'none';
+    }, 3000);
+
+  } catch (err) {
+    toast.textContent = err.message;
+    toast.className = 'serial-toast error';
+    setTimeout(() => {
+      toast.style.display = 'none';
+    }, 3000);
+  }
+}
+
+async function refreshSerialPorts(autoSelect = false) {
+  const select = document.getElementById('serial-port-select');
+  select.innerHTML = '<option value="">' + t('serial.scanning') + '</option>';
+
+  try {
+    const response = await fetch('/api/serial/ports');
+    if (!response.ok) throw new Error('Failed to list ports');
+
+    const data = await response.json();
+    const ports = data.ports || [];
+
+    if (ports.length === 0) {
+      select.innerHTML = '<option value="">' + t('serial.no_ports') + '</option>';
+      return;
+    }
+
+    select.innerHTML = '<option value="">' + t('serial.select_port') + '</option>';
+    
+    let esp32Port = null;
+    
+    ports.forEach(port => {
+      const opt = document.createElement('option');
+      opt.value = port.device;
+      opt.textContent = port.description || port.device;
+      select.appendChild(opt);
+      
+      // Auto-detect ESP32 port by common identifiers
+      const desc = (port.description || '').toLowerCase();
+      const hwid = (port.hwid || '').toLowerCase();
+      if (desc.includes('esp32') || desc.includes('ch340') || desc.includes('ch341') ||
+          desc.includes('cp210') || desc.includes('cp2102') || desc.includes('cp2104') ||
+          desc.includes('usb-serial') || hwid.includes('esp32') || hwid.includes('ch340')) {
+        if (!esp32Port) {
+          esp32Port = port.device;
+        }
+      }
+    });
+    
+    // Auto-select ESP32 port if found and requested
+    if (autoSelect && esp32Port) {
+      select.value = esp32Port;
+    }
+
+  } catch (err) {
+    select.innerHTML = '<option value="">' + t('serial.scan_failed') + '</option>';
   }
 }

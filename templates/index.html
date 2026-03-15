@@ -4,12 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>BeadCraft - Perler Bead Pattern Generator</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.css?v=14">
 </head>
 <body>
 
   <!-- Header -->
-  <header class="header">
+  <header class="header" style="display: none;">
     <a class="header-logo" href="/">BeadCraft</a>
     <div class="header-right">
       <div class="lang-switcher">
@@ -28,14 +28,6 @@
 
     <!-- Left Panel -->
     <div class="left-panel">
-
-      <!-- Upload Area -->
-      <div id="upload-area" class="upload-area">
-        <div class="upload-area-icon">+</div>
-        <div class="upload-area-text" data-i18n="upload.drop_hint">Drop image here or click to upload</div>
-        <div class="upload-area-hint" data-i18n="upload.format_hint">JPG, PNG, GIF, WEBP (max 20MB)</div>
-      </div>
-      <input type="file" id="file-input" class="hidden-input" accept="image/jpeg,image/png,image/gif,image/webp">
 
       <!-- Example Images Gallery -->
       <div class="section examples-section">
@@ -60,11 +52,6 @@
         </div>
       </div>
 
-      <!-- Preview -->
-      <div id="preview-section" class="preview-section" style="display: none;">
-        <img id="preview-image" class="preview-image" alt="Preview">
-      </div>
-
       <!-- Settings Panel -->
       <div id="settings-panel" style="display: none;">
 
@@ -87,7 +74,7 @@
           <div class="radio-group" style="margin-bottom: 12px;">
             <label class="radio-item">
               <input type="radio" name="grid-mode" value="fixed" checked onchange="setGridMode('fixed')">
-              <span data-i18n="settings.fixed_grid">Fixed Grid</span>
+              <span>难度</span>
             </label>
             <label class="radio-item">
               <input type="radio" name="grid-mode" value="pixel" onchange="setGridMode('pixel')">
@@ -97,14 +84,9 @@
 
           <div id="grid-fixed-options">
             <select id="grid-size-select">
-              <option value="15x15">15 x 15 pegs (small)</option>
-              <option value="29x29">29 x 29 pegs (1 board)</option>
-              <option value="32x32">32 x 32 pegs</option>
-              <option value="48x48" selected>48 x 48 pegs</option>
-              <option value="58x58">58 x 58 pegs (2x2 boards)</option>
-              <option value="64x64">64 x 64 pegs</option>
-              <option value="87x87">87 x 87 pegs (3x3 boards)</option>
-              <option value="96x96">96 x 96 pegs</option>
+              <option value="simple">简单 (1/4)</option>
+              <option value="normal" selected>普通 (1/2)</option>
+              <option value="hard">困难 (原始)</option>
             </select>
           </div>
 
@@ -114,45 +96,6 @@
             </label>
             <input type="range" id="pixel-size-slider" min="4" max="32" value="8" step="1">
           </div>
-        </div>
-
-        <!-- Color Controls -->
-        <div class="section">
-          <div class="section-title" data-i18n="settings.color_controls">Color Controls</div>
-
-          <label class="form-label">
-            <span data-i18n="settings.max_colors">Max colors:</span> <span id="max-colors-value">Auto</span>
-          </label>
-          <input type="range" id="max-colors-slider" min="0" max="60" value="0" step="1">
-          <div class="form-hint" data-i18n="settings.max_colors_hint">0 = unlimited (auto). Drag to limit the number of colors used.</div>
-
-          <label class="form-label" style="margin-top: 12px;">
-            <span data-i18n="settings.merge_threshold">Color merge threshold:</span> <span id="similarity-value">Off</span>
-          </label>
-          <input type="range" id="similarity-slider" min="0" max="50" value="0" step="1">
-          <div class="form-hint" data-i18n="settings.merge_hint">Merge similar colors to reduce total count. Higher = more merging.</div>
-        </div>
-
-        <!-- Image Adjustments -->
-        <div class="section">
-          <div class="section-title" data-i18n="settings.image_adjustments">Image Adjustments</div>
-
-          <label class="form-label">
-            <span data-i18n="settings.contrast">Contrast:</span> <span id="contrast-value">Auto</span>
-          </label>
-          <input type="range" id="contrast-slider" min="-50" max="50" value="0" step="1">
-
-          <label class="form-label" style="margin-top: 8px;">
-            <span data-i18n="settings.saturation">Saturation:</span> <span id="saturation-value">Auto</span>
-          </label>
-          <input type="range" id="saturation-slider" min="-50" max="50" value="0" step="1">
-
-          <label class="form-label" style="margin-top: 8px;">
-            <span data-i18n="settings.sharpness">Sharpness:</span> <span id="sharpness-value">Auto</span>
-          </label>
-          <input type="range" id="sharpness-slider" min="-50" max="50" value="0" step="1">
-
-          <div class="form-hint" data-i18n="settings.adjust_hint">0 = auto-detect. Drag left to reduce, right to boost.</div>
         </div>
 
         <!-- Background Removal -->
@@ -165,51 +108,56 @@
           <div class="form-hint" data-i18n="settings.bg_hint">Detects the dominant border color and flood-fills it as transparent.</div>
         </div>
 
-        <!-- Dithering -->
-        <div class="section">
-          <div class="section-title" data-i18n="settings.dithering">Dithering</div>
-          <label class="checkbox-item">
-            <input type="checkbox" id="dithering-checkbox">
-            <span data-i18n="settings.enable_dithering">Enable Floyd-Steinberg dithering</span>
-          </label>
-          <div class="form-hint" data-i18n="settings.dithering_hint">Produces smoother color transitions but takes longer</div>
-        </div>
-
-        <!-- Generate Button -->
-        <div class="section" style="border-top: none; padding-top: 8px;">
-          <button id="generate-btn" class="btn btn-primary" data-i18n="btn.generate">Generate Pattern</button>
-        </div>
-
       </div>
     </div>
 
     <!-- Right Panel -->
     <div class="right-panel">
 
-      <!-- Empty State -->
-      <div id="empty-state" class="empty-state">
-        <div class="empty-state-icon">&#9638;</div>
-        <div class="empty-state-text" data-i18n="result.empty">Upload an image and generate a pattern</div>
-      </div>
-
       <!-- Result Area -->
-      <div id="result-area" style="display: none; width: 100%; max-width: 640px;">
+      <div id="result-area" style="width: 100%; max-width: 640px;">
 
         <!-- Canvas Toolbar -->
         <div class="canvas-toolbar">
           <button id="edit-toggle" class="toggle-btn" onclick="toggleEditMode()" data-i18n="btn.edit">Edit</button>
           <div style="flex: 1;"></div>
-          <button class="btn btn-secondary" onclick="exportPNG()" data-i18n="btn.export_png">Export PNG</button>
-          <button class="btn btn-secondary" onclick="exportPDF()" data-i18n="btn.export_pdf">Export PDF</button>
+          <button id="clear-btn" class="toolbar-btn" onclick="clearCanvas()" title="清除">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+          </button>
+          <button id="upload-btn" class="toolbar-btn" onclick="document.getElementById('file-input').click()" title="上传">
+            <span class="toolbar-btn-icon">+</span>
+          </button>
+          <input type="file" id="file-input" class="hidden-input" accept="image/jpeg,image/png,image/gif,image/webp">
+          <select id="led-matrix-size" class="led-size-btn" onchange="updateLedSizeDisplay()">
+            <option value="16">16</option>
+            <option value="32">32</option>
+            <option value="52">52</option>
+            <option value="64" selected>64</option>
+          </select>
+          <button class="toolbar-btn" onclick="showSerialSettings()" title="设置">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+          </button>
         </div>
 
-        <!-- Canvas -->
+        <!-- Canvas Container with Empty State -->
         <div class="canvas-container" style="margin: 0 auto;">
-          <canvas id="pattern-canvas"></canvas>
+          <!-- Empty State (default) -->
+          <div id="empty-state" class="empty-state">
+            <div class="empty-state-icon">&#9638;</div>
+            <div class="empty-state-text" data-i18n="result.empty">Upload an image and generate a pattern</div>
+          </div>
+          <!-- Pattern Canvas (after generate) -->
+          <canvas id="pattern-canvas" style="display: none;"></canvas>
         </div>
 
         <!-- Color Panel -->
-        <div class="color-panel">
+        <div class="color-panel" id="color-panel" style="display: none;">
           <div class="color-panel-title" data-i18n="result.colors_used">Colors Used</div>
           <div id="color-list" class="color-list"></div>
           <div id="color-total" class="color-total"></div>
@@ -219,7 +167,101 @@
     </div>
   </div>
 
-  <script src="/static/i18n.js"></script>
-  <script src="/static/app.js"></script>
+  <script src="/static/i18n.js?v=41"></script>
+  <script src="/static/app.js?v=41"></script>
+
+  <!-- Serial Port Dialog (Settings) -->
+  <div id="serial-settings-dialog" class="modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>设置</h3>
+        <button class="modal-close" onclick="hideSerialSettings()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <!-- Connection Mode -->
+        <div class="form-group">
+          <label class="form-label">连接模式：</label>
+          <div class="mode-toggle">
+            <button class="mode-btn active" onclick="setConnectionMode('serial')">串口</button>
+            <button class="mode-btn" onclick="setConnectionMode('ble')">蓝牙</button>
+          </div>
+        </div>
+        
+        <!-- Serial Port Selection (default) -->
+        <div id="serial-settings" class="connection-settings">
+          <div class="form-group">
+            <label class="form-label">串口：</label>
+            <select id="serial-port-select">
+              <option value="">扫描中...</option>
+            </select>
+            <button class="btn btn-small" onclick="refreshSerialPorts()">刷新</button>
+          </div>
+          <div class="form-group">
+            <label class="form-label">波特率：</label>
+            <select id="serial-baud-select">
+              <option value="115200">115200</option>
+              <option value="230400">230400</option>
+              <option value="460800" selected>460800</option>
+              <option value="921600">921600</option>
+            </select>
+          </div>
+        </div>
+        
+        <!-- BLE Device Selection (hidden by default) -->
+        <div id="ble-settings" class="connection-settings" style="display: none;">
+          <div class="form-group">
+            <label class="form-label">蓝牙设备：</label>
+            <select id="ble-device-select">
+              <option value="">扫描中...</option>
+            </select>
+            <button class="btn btn-small" onclick="refreshBLEDevices()">刷新</button>
+          </div>
+        </div>
+        
+        <!-- Background Color -->
+        <div class="form-group">
+          <label class="form-label">背景色（透明区域）：</label>
+          <input type="color" id="serial-bg-color" value="#000000">
+        </div>
+        
+        <!-- Action Buttons -->
+        <div class="form-group" style="border-top: 1px solid #ddd; padding-top: 15px; margin-top: 15px;">
+          <label class="form-label">操作：</label>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+            <button class="btn btn-primary" onclick="sendToESP32Direct(); hideSerialSettings();">发送到ESP32</button>
+            <button class="btn btn-secondary" onclick="exportPNG()">导出PNG</button>
+            <button class="btn btn-secondary" onclick="exportPDF()">导出PDF</button>
+            <button class="btn btn-secondary" onclick="exportJSON()">导出JSON</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="hideSerialSettings()">关闭</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Serial Status Toast -->
+  <div id="serial-toast" class="serial-toast" style="display: none;"></div>
+  
+  <!-- Image Crop Dialog -->
+  <div id="crop-dialog" class="modal" style="display: none;">
+    <div class="modal-content" style="width: auto; max-width: 80vw; max-height: 85vh;">
+      <div class="modal-header">
+        <h3>裁剪图像</h3>
+        <button class="modal-close" onclick="cancelCrop()">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 10px; display: flex; justify-content: center; align-items: center; overflow: auto;">
+        <div id="crop-container" style="position: relative; display: inline-block;">
+          <img id="crop-image" style="max-width: 100%; max-height: 70vh; display: block;">
+          <div id="crop-box" style="position: absolute; border: 2px dashed #fff; box-shadow: 0 0 0 9999px rgba(0,0,0,0.5); cursor: move;"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="cancelCrop()">取消</button>
+        <button class="btn btn-primary" onclick="confirmCrop()">确认裁剪</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
